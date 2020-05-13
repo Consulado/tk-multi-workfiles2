@@ -9,11 +9,15 @@
 # not expressly granted therein are reserved by Shotgun Software Inc.
 
 import maya.cmds as cmds
-
+import os
 import sgtk
 from sgtk.platform.qt import QtGui
 
 HookClass = sgtk.get_hook_baseclass()
+
+consulado_model = sgtk.platform.import_framework(
+    "tk-framework-consuladoutils", "shotgun_model"
+)
 
 
 class SceneOperation(HookClass):
@@ -125,3 +129,9 @@ class SceneOperation(HookClass):
             # do new file:
             cmds.file(newFile=True, force=True)
             return True
+
+    def update_scene_info(self, context):
+        engine = sgtk.platform.current_engine()
+        sg = engine.shotgun
+        name = os.path.basename(cmds.file(q=True, sn=True))
+        task = context.task
