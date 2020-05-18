@@ -139,37 +139,41 @@ class SceneOperation(HookClass):
 
     def update_scene_info(self, context):
         engine = sgtk.platform.current_engine()
+        logger = sgtk.platform.get_logger("tk-multi-workfile2")
         sg = engine.shotgun
         name = os.path.basename(cmds.file(q=True, sn=True))
         task = context.task
         entity = context.entity
 
+        logger.debug("Starting to read a scene data")
+        sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
+        sg_node_type_name = consulado_globals.get_custom_entity_by_alias("node_type")
+        node_fields = [
+            "project",
+            "id",
+            "code",
+            "sg_link",
+            "sg_type",
+            "sg_downstream_node",
+            "sg_upstream_node",
+            "published_file",
+        ]
         ms = MayaScene()
         for asset in ms:
-            print("asset:", asset)
+            logger.debug("asset: %s" % asset)
             if not asset.is_reference:
+                logger.debug("This asset isn't referenced")
                 # ensures that all geometries has the consuladoNodeID
                 asset.create_sg_attr()
 
-            geos = [geo for geo in asset]
-            sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
-            sg_node_type_name = consulado_globals.get_custom_entity_by_alias(
-                "node_type"
-            )
-            node_fields = [
-                "project",
-                "id",
-                "code",
-                "sg_link",
-                "sg_type",
-                "sg_downstream_node",
-                "sg_upstream_node",
-                "published_file",
-            ]
             Nodes = consulado_model.EntityIter(sg_node_name, node_fields, context, sg)
-            for geo in geos:
-                print("geo:", geo)
+            for geo in asset:
+                logger.debug("starting to check the geo %s" % geo)
                 if not hasattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR):
+                    logger.debug(
+                        "This geometry haven't the attribute %s"
+                        % ms.DEFAULT_CONSULADO_GEO_ATTR
+                    )
                     continue
 
                 node = Nodes.add_new_entity()
@@ -181,12 +185,19 @@ class SceneOperation(HookClass):
                     "id": 1,
                 }
                 node.load()
+                logger.debug("Found node %s" % node.shotgun_entity_data)
                 if node.id is None:
                     node.create()
                 else:
                     node.update()
-                attr = getattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR)
-                attr.set(node.id)
+                try:
+                    attr = getattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR)
+                    attr.set(node.id)
+                except Exception as e:
+                    logger.error(
+                        "Error while set the attribute %s on geo %s, because %s"
+                        % (ms.DEFAULT_CONSULADO_GEO_ATTR, geo, e)
+                    )
 
         # TODO: Caso seja uma task do tipo anim ou shot, verificar as cameras e os namespaces atuais
         # TODO: Verificar se a cena atual eh um workspace conhecido e caso nao seja, adiciona-lo no shotgun
