@@ -146,6 +146,7 @@ class SceneOperation(HookClass):
 
         ms = MayaScene()
         for asset in ms:
+            print("asset:", asset)
             if not asset.is_reference:
                 # ensures that all geometries has the consuladoNodeID
                 asset.create_sg_attr()
@@ -167,6 +168,7 @@ class SceneOperation(HookClass):
             ]
             Nodes = consulado_model.EntityIter(sg_node_name, node_fields, context, sg)
             for geo in geos:
+                print("geo:", geo)
                 if not hasattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR):
                     continue
 
