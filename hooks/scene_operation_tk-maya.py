@@ -18,6 +18,11 @@ HookClass = sgtk.get_hook_baseclass()
 consulado_model = sgtk.platform.import_framework(
     "tk-framework-consuladoutils", "shotgun_model"
 )
+consulado_globals = sgtk.platform.import_framework(
+    "tk-framework-consuladoutils", "shotgun_globals"
+)
+
+MayaScene = sgtk.platform.import_framework("tk-framework-consuladoutils", "MayaScene")
 
 
 class SceneOperation(HookClass):
@@ -79,9 +84,11 @@ class SceneOperation(HookClass):
             cmds.file(new=True, force=True)
             cmds.file(file_path, open=True, force=True)
         elif operation == "save":
+            self.update_scene_info()
             # save the current scene:
             cmds.file(save=True)
         elif operation == "save_as":
+            self.update_scene_info()
             # first rename the scene as file_path:
             cmds.file(rename=file_path)
 
@@ -135,3 +142,50 @@ class SceneOperation(HookClass):
         sg = engine.shotgun
         name = os.path.basename(cmds.file(q=True, sn=True))
         task = context.task
+        entity = context.entity
+
+        ms = MayaScene()
+        for asset in ms:
+            if not asset.is_reference:
+                # ensures that all geometries has the consuladoNodeID
+                asset.create_sg_attr()
+
+            geos = [geo for geo in asset]
+            sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
+            sg_node_type_name = consulado_globals.get_custom_entity_by_alias(
+                "node_type"
+            )
+            node_fields = [
+                "project",
+                "id",
+                "code",
+                "sg_link",
+                "sg_type",
+                "sg_downstream_node",
+                "sg_upstream_node",
+                "published_file",
+            ]
+            Nodes = consulado_model.EntityIter(sg_node_name, node_fields, context, sg)
+            for geo in geos:
+                if not hasattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR):
+                    continue
+
+                node = Nodes.add_new_entity()
+                node.code = geo.fullPath()
+                node.sg_link = entity
+                # TODO: Remover hardcode
+                node.sg_type = {
+                    "type": sg_node_type_name,
+                    "id": 1,
+                }
+                node.load()
+                if node.id is None:
+                    node.create()
+                else:
+                    node.update()
+                attr = getattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR)
+                attr.set(node.id)
+
+        # TODO: Caso seja uma task do tipo anim ou shot, verificar as cameras e os namespaces atuais
+        # TODO: Verificar se a cena atual eh um workspace conhecido e caso nao seja, adiciona-lo no shotgun
+        # TODO: Caso a cena possua alguma geometria nao referenciada, criar ids e adicionar ao workspace atual
