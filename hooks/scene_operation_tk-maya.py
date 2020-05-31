@@ -15,15 +15,6 @@ from sgtk.platform.qt import QtGui
 
 HookClass = sgtk.get_hook_baseclass()
 
-consulado_model = sgtk.platform.import_framework(
-    "tk-framework-consuladoutils", "shotgun_model"
-)
-consulado_globals = sgtk.platform.import_framework(
-    "tk-framework-consuladoutils", "shotgun_globals"
-)
-
-MayaScene = sgtk.platform.import_framework("tk-framework-consuladoutils", "MayaScene")
-
 
 class SceneOperation(HookClass):
     """
@@ -145,6 +136,12 @@ class SceneOperation(HookClass):
         task = context.task
         entity = context.entity
 
+        # Consulado framework init
+        tk_consuladoutils = self.load_framework("tk-framework-consuladoutils_v0.x.x")
+        consulado_globals = tk_consuladoutils.import_module("shotgun_globals")
+        maya_utils = tk_consuladoutils.import_module("maya_utils")
+        consulado_model = tk_consuladoutils.import_module("shotgun_model")
+
         logger.debug("Starting to read a scene data")
         sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
         sg_node_type_name = consulado_globals.get_custom_entity_by_alias("node_type")
@@ -158,7 +155,7 @@ class SceneOperation(HookClass):
             "sg_upstream_node",
             "published_file",
         ]
-        ms = MayaScene()
+        ms = maya_utils.MayaScene()
         for asset in ms:
             logger.debug("asset: %s" % asset)
             if not asset.is_reference:
