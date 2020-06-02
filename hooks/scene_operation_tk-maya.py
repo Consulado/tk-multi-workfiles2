@@ -22,6 +22,24 @@ class SceneOperation(HookClass):
     current scene
     """
 
+    def __init__(self, *args, **kwargs):
+        super(SceneOperation, self).__init__(*args, **kwargs)
+
+        self.logger = sgtk.platform.get_logger("tk-multi-workfile2")
+
+        # Consulado framework init
+        self.tk_consuladoutils = self.load_framework(
+            "tk-framework-consuladoutils_v0.x.x"
+        )
+        self.consulado_globals = tk_consuladoutils.import_module("shotgun_globals")
+        self.maya_utils = tk_consuladoutils.import_module("maya_utils")
+        self.consulado_model = tk_consuladoutils.import_module("shotgun_model")
+
+        self.sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
+        self.sg_node_type_name = consulado_globals.get_custom_entity_by_alias(
+            "node_type"
+        )
+
     def execute(
         self,
         operation,
@@ -130,72 +148,141 @@ class SceneOperation(HookClass):
 
     def update_scene_info(self, context):
         engine = sgtk.platform.current_engine()
-        logger = sgtk.platform.get_logger("tk-multi-workfile2")
         sg = engine.shotgun
         name = os.path.basename(cmds.file(q=True, sn=True))
         task = context.task
         entity = context.entity
 
-        # Consulado framework init
-        tk_consuladoutils = self.load_framework("tk-framework-consuladoutils_v0.x.x")
-        consulado_globals = tk_consuladoutils.import_module("shotgun_globals")
-        maya_utils = tk_consuladoutils.import_module("maya_utils")
-        consulado_model = tk_consuladoutils.import_module("shotgun_model")
-
-        logger.debug("Starting to read a scene data")
-        sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
-        sg_node_type_name = consulado_globals.get_custom_entity_by_alias("node_type")
+        self.logger.debug("Starting to read a scene data")
         node_fields = [
             "project",
             "id",
             "code",
             "sg_link",
-            "sg_type",
+            "sg_node_type",
             "sg_downstream_node",
             "sg_upstream_node",
             "published_file",
         ]
         ms = maya_utils.MayaScene()
         for asset in ms:
-            logger.debug("asset: %s" % asset)
+            self.logger.debug("asset: %s" % asset)
             if not asset.is_reference:
-                logger.debug("This asset isn't referenced")
+                self.logger.debug("This asset isn't referenced")
                 # ensures that all geometries has the consuladoNodeID
                 asset.create_sg_attr()
 
-            Nodes = consulado_model.EntityIter(sg_node_name, node_fields, context, sg)
-            for geo in asset:
-                logger.debug("starting to check the geo %s" % geo)
-                if not hasattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR):
-                    logger.debug(
-                        "This geometry haven't the attribute %s"
-                        % ms.DEFAULT_CONSULADO_GEO_ATTR
-                    )
-                    continue
-
-                node = Nodes.add_new_entity()
-                node.code = geo.fullPath()
-                node.sg_link = entity
-                # TODO: Remover hardcode
-                node.sg_type = {
-                    "type": sg_node_type_name,
-                    "id": 1,
-                }
-                node.load()
-                logger.debug("Found node %s" % node.shotgun_entity_data)
-                if node.id is None:
-                    node.create()
-                else:
-                    node.update()
-                try:
-                    attr = getattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR)
-                    attr.set(node.id)
-                except Exception as e:
-                    logger.error(
-                        "Error while set the attribute %s on geo %s, because %s"
-                        % (ms.DEFAULT_CONSULADO_GEO_ATTR, geo, e)
-                    )
+            Nodes = self.consulado_model.EntityIter(
+                self.sg_node_name, node_fields, context, sg
+            )
+            if entity.get("type", "").lower() == "asset":
+                self.logger.debug("Asset detected: %s" % entity)
+                self.check_asset_nodes(Nodes, ms, entity, asset)
+            else:
+                self.logger.debug("Shot detected: %s" % entity)
 
         # TODO: Caso seja uma task do tipo anim ou shot, verificar as cameras e os namespaces atuais
         # TODO: Verificar se a cena atual eh um workspace conhecido e caso nao seja, adiciona-lo no shotgun
         # TODO: Caso a cena possua alguma geometria nao referenciada, criar ids e adicionar ao workspace atual
+
+    def check_asset_nodes(self, node_entity, ms, entity, asset):
+        for geo in asset:
+            self.logger.debug("starting to check the geo %s" % geo)
+            if not hasattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR):
+                self.logger.debug(
+                    "This geometry haven't the attribute %s"
+                    % ms.DEFAULT_CONSULADO_GEO_ATTR
+                )
+                continue
+
+            node = node_entity.add_new_entity()
+            node.code = geo.fullPath()
+            node.sg_link = entity
+            # TODO: Remover hardcode
+            node.sg_node_type = {
+                "type": sg_node_type_name,
+                "id": 1,
+            }
+            node.entity_filter = [
+                ["code", "is", node.code],
+                ["sg_link", "is", node.sg_link],
+                ["sg_node_type", "is", node.sg_node_type],
+            ]
+            node.load()
+            self.logger.debug(
+                "Found the Shotguns entity node: %s" % node.shotgun_entity_data
+            )
+            if node.id is None:
+                node.create()
+            else:
+                node.update()
+            try:
+                attr = getattr(geo, ms.DEFAULT_CONSULADO_GEO_ATTR)
+                attr.set(node.id)
+            except Exception as e:
+                self.logger.error(
+                    "Error while set the attribute %s on geo %s, because %s"
+                    % (ms.DEFAULT_CONSULADO_GEO_ATTR, geo, e)
+                )
+
+    def check_cameras(self, context, maya_scene, workfile):
+        # TODO: verificar as cameras
+        engine = sgtk.platform.current_engine()
+
+        sg = engine.shotgun
+        name = os.path.basename(cmds.file(q=True, sn=True))
+        task = context.task
+        entity = context.entity
+
+        tk_consuladoutils = self.load_framework("tk-framework-consuladoutils_v0.x.x")
+        consulado_model = tk_consuladoutils.import_module("shotgun_model")
+
+        camera_fields = [
+            "project",
+            "id",
+            "code",
+            "custom_entity04_sg_camera_custom_entity04s",
+        ]
+        Cameras = consulado_model.EntityIter("Camera", camera_fields, context, sg)
+
+        for cam in maya_scene.non_default_cameras():
+            self.logger.debug("Checking the camera %s" % cam.nodeName())
+            sg_cam = Cameras.add_new_entity()
+            sg_cam.code = cam.nodeName()
+            sg_cam.custom_entity04_sg_camera_custom_entity04s = workfile
+            sg_cam.entity_filter = [
+                ["code", "is", sg_cam.code],
+                ["custom_entity04_sg_camera_custom_entity04s", "is", workfile],
+            ]
+            sg_cam.load()
+            if sg_cam.id is None:
+                sg_cam.create()
+            else:
+                sg_cam.update()
+
+    def check_namespaces(self, context, maya_scene, workfile):
+        engine = sgtk.platform.current_engine()
+
+        sg = engine.shotgun
+        name = os.path.basename(cmds.file(q=True, sn=True))
+        task = context.task
+        entity = context.entity
+
+        tk_consuladoutils = self.load_framework("tk-framework-consuladoutils_v0.x.x")
+        consulado_model = tk_consuladoutils.import_module("shotgun_model")
+        consulado_globals = tk_consuladoutils.import_module("shotgun_globals")
+        sg_namespace_type = consulado_globals.get_custom_entity_by_alias("namespace")
+
+        namespace_fields = ["project", "id", "code", "sg_link", "sg_scene"]
+        sg_namespaces = consulado_model.EntityIter(
+            sg_namespace_type, namespace_fields, context, sg
+        )
+
+        for namespace in maya_scene.scene_namespaces():
+            self.logger.debug("checking the asset namespace: %s" % namespace)
+
+            sg_namespace = sg_namespace.add_new_entity()
+            sg_namespace.code = namespace
+
+    def check_workfile(self, context):
+        pass
