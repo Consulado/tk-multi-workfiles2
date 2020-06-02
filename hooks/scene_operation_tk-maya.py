@@ -29,12 +29,12 @@ class SceneOperation(HookClass):
         self.tk_consuladoutils = self.load_framework(
             "tk-framework-consuladoutils_v0.x.x"
         )
-        self.consulado_globals = tk_consuladoutils.import_module("shotgun_globals")
-        self.maya_utils = tk_consuladoutils.import_module("maya_utils")
-        self.consulado_model = tk_consuladoutils.import_module("shotgun_model")
+        self.consulado_globals = self.tk_consuladoutils.import_module("shotgun_globals")
+        self.maya_utils = self.tk_consuladoutils.import_module("maya_utils")
+        self.consulado_model = self.tk_consuladoutils.import_module("shotgun_model")
 
-        self.sg_node_name = consulado_globals.get_custom_entity_by_alias("node")
-        self.sg_node_type_name = consulado_globals.get_custom_entity_by_alias(
+        self.sg_node_name = self.consulado_globals.get_custom_entity_by_alias("node")
+        self.sg_node_type_name = self.consulado_globals.get_custom_entity_by_alias(
             "node_type"
         )
 
@@ -95,11 +95,11 @@ class SceneOperation(HookClass):
             cmds.file(new=True, force=True)
             cmds.file(file_path, open=True, force=True)
         elif operation == "save":
-            self.update_scene_info()
+            self.update_scene_info(context)
             # save the current scene:
             cmds.file(save=True)
         elif operation == "save_as":
-            self.update_scene_info()
+            self.update_scene_info(context)
             # first rename the scene as file_path:
             cmds.file(rename=file_path)
 
@@ -166,7 +166,7 @@ class SceneOperation(HookClass):
             "sg_upstream_node",
             "published_file",
         ]
-        ms = maya_utils.MayaScene()
+        ms = self.maya_utils.MayaScene()
         for asset in ms:
             self.logger.debug("asset: %s" % asset)
             if not asset.is_reference:
@@ -177,15 +177,17 @@ class SceneOperation(HookClass):
             Nodes = self.consulado_model.EntityIter(
                 self.sg_node_name, node_fields, context, sg
             )
+            # TODO: Encontrar workfile ID ou criar um
+
             if entity.get("type", "").lower() == "asset":
                 self.logger.debug("Asset detected: %s" % entity)
+                # TODO: Adicionar info do asset no workfile
                 self.check_asset_nodes(Nodes, ms, entity, asset)
             else:
                 self.logger.debug("Shot detected: %s" % entity)
-
-        # TODO: Caso seja uma task do tipo anim ou shot, verificar as cameras e os namespaces atuais
-        # TODO: Verificar se a cena atual eh um workspace conhecido e caso nao seja, adiciona-lo no shotgun
-        # TODO: Caso a cena possua alguma geometria nao referenciada, criar ids e adicionar ao workspace atual
+                # TODO: Verificar cameras
+                # TODO: Verificar namespaces
+                # TODO: verificar outras geometrias n referenciadas
 
     def check_asset_nodes(self, node_entity, ms, entity, asset):
         for geo in asset:
@@ -202,7 +204,7 @@ class SceneOperation(HookClass):
             node.sg_link = entity
             # TODO: Remover hardcode
             node.sg_node_type = {
-                "type": sg_node_type_name,
+                "type": self.sg_node_type_name,
                 "id": 1,
             }
             node.entity_filter = [
