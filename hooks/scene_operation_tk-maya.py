@@ -22,8 +22,8 @@ class SceneOperation(HookClass):
     current scene
     """
 
-    def __init__(self, *args, **kwargs):
-        super(SceneOperation, self).__init__(*args, **kwargs)
+    def __init__(self, parent):
+        super(SceneOperation, self).__init__(parent)
 
         self.logger = sgtk.platform.get_logger("tk-multi-workfile2")
 
