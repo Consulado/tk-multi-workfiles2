@@ -25,8 +25,6 @@ class SceneOperation(HookClass):
     def __init__(self, parent):
         super(SceneOperation, self).__init__(parent)
 
-        self.logger = sgtk.platform.get_logger("tk-multi-workfile2")
-
         # Consulado framework init
         self.tk_consuladoutils = self.load_framework(
             "tk-framework-consuladoutils_v0.x.x"
@@ -39,6 +37,10 @@ class SceneOperation(HookClass):
         self.sg_node_type_name = consulado_globals.get_custom_entity_by_alias(
             "node_type"
         )
+
+    @property
+    def logger(self):
+        return sgtk.platform.get_logger("tk-multi-workfile2")
 
     def execute(
         self,
