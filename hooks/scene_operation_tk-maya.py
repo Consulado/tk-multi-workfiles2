@@ -34,6 +34,9 @@ class SceneOperation(HookClass):
         self.consulado_model = self.tk_consuladoutils.import_module("shotgun_model")
 
         self.sg_node_name = self.consulado_globals.get_custom_entity_by_alias("node")
+        self.sg_workfile_name = self.consulado_globals.get_custom_entity_by_alias(
+            "scene"
+        )
         self.sg_node_type_name = self.consulado_globals.get_custom_entity_by_alias(
             "node_type"
         )
@@ -154,40 +157,46 @@ class SceneOperation(HookClass):
         name = os.path.basename(cmds.file(q=True, sn=True))
         task = context.task
         entity = context.entity
+        step = context.step
+        shot_step = step.get("type", "").lower() in ["anim", "render"]
+        asset_step = step.get("type", "").lower() == ["rig"]
 
         self.logger.debug("Starting to read a scene data")
-        node_fields = [
-            "project",
-            "id",
-            "code",
-            "sg_link",
-            "sg_node_type",
-            "sg_downstream_node",
-            "sg_upstream_node",
-            "published_file",
-        ]
+        workfile = self.check_workfile(context, sg, name)
         ms = self.maya_utils.MayaScene()
-        for asset in ms:
-            self.logger.debug("asset: %s" % asset)
-            if not asset.is_reference:
-                self.logger.debug("This asset isn't referenced")
-                # ensures that all geometries has the consuladoNodeID
-                asset.create_sg_attr()
+        if asset_step:
+            node_fields = [
+                "project",
+                "id",
+                "code",
+                "sg_link",
+                "sg_node_type",
+                "sg_downstream_node",
+                "sg_upstream_node",
+                "published_file",
+            ]
+            for asset in ms:
+                self.logger.debug("asset: %s" % asset)
+                if not asset.is_reference:
+                    self.logger.debug("This asset isn't referenced")
+                    # ensures that all geometries has the consuladoNodeID
+                    asset.create_sg_attr()
 
-            Nodes = self.consulado_model.EntityIter(
-                self.sg_node_name, node_fields, context, sg
-            )
-            # TODO: Encontrar workfile ID ou criar um
+                Nodes = self.consulado_model.EntityIter(
+                    self.sg_node_name, node_fields, context, sg
+                )
 
-            if entity.get("type", "").lower() == "asset":
-                self.logger.debug("Asset detected: %s" % entity)
-                # TODO: Adicionar info do asset no workfile
-                self.check_asset_nodes(Nodes, ms, entity, asset)
-            else:
-                self.logger.debug("Shot detected: %s" % entity)
-                # TODO: Verificar cameras
-                # TODO: Verificar namespaces
-                # TODO: verificar outras geometrias n referenciadas
+                if asset_step:
+                    self.logger.debug("Asset detected: %s" % entity)
+                    self.check_asset_nodes(Nodes, ms, entity, asset)
+        elif shot_step:
+            self.logger.debug("Shot detected: %s" % entity)
+            cam_status = self.check_cameras(context, ms, workfile)
+            ns_status = self.check_namespaces(context, ms, workfile)
+            if cam_status or ns_status:
+                workfile.update()
+
+            # TODO: verificar outras geometrias n referenciadas
 
     def check_asset_nodes(self, node_entity, ms, entity, asset):
         for geo in asset:
@@ -230,7 +239,6 @@ class SceneOperation(HookClass):
                 )
 
     def check_cameras(self, context, maya_scene, workfile):
-        # TODO: verificar as cameras
         engine = sgtk.platform.current_engine()
 
         sg = engine.shotgun
@@ -264,6 +272,12 @@ class SceneOperation(HookClass):
             else:
                 sg_cam.update()
 
+        # update workfile info
+        sg_cams = [cam.shotgun_entity_data for cam in Cameras]
+        if sg_cams:
+            workfile.sg_cameras = sg_cams
+            return True
+
     def check_namespaces(self, context, maya_scene, workfile):
         engine = sgtk.platform.current_engine()
 
@@ -288,5 +302,33 @@ class SceneOperation(HookClass):
             sg_namespace = sg_namespace.add_new_entity()
             sg_namespace.code = namespace
 
-    def check_workfile(self, context):
-        pass
+        # update workfile info
+        sg_namespaces = [n.shotgun_entity_data for n in sg_namespace]
+        if sg_namespaces:
+            workfile.sg_namespaces = sg_namespaces
+            return True
+
+    def check_workfile(self, context, sg, scene_name):
+        workfile_fields = [
+            "code",
+            "id",
+            "project",
+            "sg_link",
+            "sg_misc",
+            "sg_namespaces",
+            "sg_published_files",
+            "sg_camera",
+        ]
+        workfile = self.consulado_model.Entity(
+            self.sg_workfile_name, workfile_fields, context, sg
+        )
+        workfile.entity_filter = [
+            ["code", "is", scene_name],
+            ["link", "is", context.task],
+        ]
+        workfile.load()
+        if workfile.id is None:
+            workfile.sg_link = context.task
+            workfile.create()
+
+        return workfile
