@@ -324,7 +324,7 @@ class SceneOperation(HookClass):
         )
         workfile.entity_filter = [
             ["code", "is", scene_name],
-            ["link", "is", context.task],
+            ["sg_link", "is", context.task],
         ]
         workfile.load()
         if workfile.id is None:
