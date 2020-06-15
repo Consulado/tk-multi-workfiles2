@@ -158,8 +158,13 @@ class SceneOperation(HookClass):
         task = context.task
         entity = context.entity
         step = context.step
-        shot_step = step.get("type", "").lower() in ["anim", "render"]
-        asset_step = step.get("type", "").lower() == ["rig"]
+        shot_step = step.get("name", "").lower() in [
+            "animation",
+            "render",
+            "lighting",
+            "composition",
+        ]
+        asset_step = step.get("name", "").lower() == ["rig"]
 
         self.logger.debug("Starting to read a scene data")
         workfile = self.check_workfile(context, sg, name)
