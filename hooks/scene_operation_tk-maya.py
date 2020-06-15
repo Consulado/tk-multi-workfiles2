@@ -328,6 +328,7 @@ class SceneOperation(HookClass):
         ]
         workfile.load()
         if workfile.id is None:
+            workfile.code = scene_name
             workfile.sg_link = context.task
             workfile.create()
 
