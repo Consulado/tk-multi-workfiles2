@@ -98,11 +98,11 @@ class SceneOperation(HookClass):
             cmds.file(new=True, force=True)
             cmds.file(file_path, open=True, force=True)
         elif operation == "save":
-            self.update_scene_info(context)
+            self.update_scene_info(context, file_path)
             # save the current scene:
             cmds.file(save=True)
         elif operation == "save_as":
-            self.update_scene_info(context)
+            self.update_scene_info(context, file_path)
             # first rename the scene as file_path:
             cmds.file(rename=file_path)
 
@@ -151,10 +151,10 @@ class SceneOperation(HookClass):
             cmds.file(newFile=True, force=True)
             return True
 
-    def update_scene_info(self, context):
+    def update_scene_info(self, context, file_path):
         engine = sgtk.platform.current_engine()
         sg = engine.shotgun
-        name = os.path.basename(cmds.file(q=True, sn=True))
+        name = os.path.basename(file_path)
         task = context.task
         entity = context.entity
         step = context.step
