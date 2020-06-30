@@ -301,16 +301,17 @@ class SceneOperation(HookClass):
             sg_namespace_type, namespace_fields, context, sg
         )
 
+        sg_namespace_entity = []
         for namespace in maya_scene.scene_namespaces():
             self.logger.debug("checking the asset namespace: %s" % namespace)
 
-            sg_namespace = sg_namespace.add_new_entity()
+            sg_namespace = sg_namespaces.add_new_entity()
             sg_namespace.code = namespace
+            sg_namespace_entity.append(sg_namespace.shotgun_entity_data)
 
         # update workfile info
-        sg_namespaces = [n.shotgun_entity_data for n in sg_namespace]
-        if sg_namespaces:
-            workfile.sg_namespaces = sg_namespaces
+        if sg_namespace_entity:
+            workfile.sg_namespaces = sg_namespace_entity
             return True
 
     def check_workfile(self, context, sg, scene_name):
