@@ -164,7 +164,7 @@ class SceneOperation(HookClass):
             "lighting",
             "composition",
         ]
-        asset_step = step.get("name", "").lower() == ["rig"]
+        asset_step = step.get("name", "").lower() in ["rig"]
 
         self.logger.debug("Starting to read a scene data")
         workfile = self.check_workfile(context, sg, name)
@@ -190,10 +190,8 @@ class SceneOperation(HookClass):
                 Nodes = self.consulado_model.EntityIter(
                     self.sg_node_name, node_fields, context, sg
                 )
-
-                if asset_step:
-                    self.logger.debug("Asset detected: %s" % entity)
-                    self.check_asset_nodes(Nodes, ms, entity, asset)
+                self.logger.debug("Asset detected: %s" % entity)
+                self.check_asset_nodes(Nodes, ms, entity, asset)
         elif shot_step:
             self.logger.debug("Shot detected: %s" % entity)
             cam_status = self.check_cameras(context, ms, workfile)
