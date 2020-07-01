@@ -286,7 +286,7 @@ class SceneOperation(HookClass):
         # update workfile info
         sg_cams = [cam.shotgun_entity_data for cam in Cameras]
         if sg_cams:
-            workfile.sg_cameras = sg_cams
+            workfile.sg_camera = sg_cams
             return True
 
     def check_namespaces(self, context, maya_scene, workfile):
