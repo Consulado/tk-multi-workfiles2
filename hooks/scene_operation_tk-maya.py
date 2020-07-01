@@ -313,6 +313,11 @@ class SceneOperation(HookClass):
 
             sg_namespace = sg_namespaces.add_new_entity()
             sg_namespace.code = namespace
+            sg_namespace.load()
+            if sg_namespace.id is None:
+                sg_namespace.create()
+            else:
+                sg_namespace.update()
             sg_namespace_entity.append(sg_namespace.shotgun_entity_data)
 
         # update workfile info
