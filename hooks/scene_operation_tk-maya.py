@@ -266,15 +266,15 @@ class SceneOperation(HookClass):
             self.logger.debug("Checking the camera %s" % cam.nodeName())
             sg_cam = Cameras.add_new_entity()
             sg_cam.code = cam.nodeName()
-            sg_cam.custom_entity04_sg_camera_custom_entity04s = (
+            sg_cam.custom_entity04_sg_camera_custom_entity04s = [
                 workfile.shotgun_entity_data
-            )
+            ]
             sg_cam.entity_filter = [
                 ["code", "is", sg_cam.code],
                 [
                     "custom_entity04_sg_camera_custom_entity04s",
-                    "is",
-                    workfile.shotgun_entity_data,
+                    "in",
+                    [workfile.shotgun_entity_data],
                 ],
             ]
             sg_cam.load()
