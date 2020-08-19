@@ -164,7 +164,7 @@ class SceneOperation(HookClass):
             "lighting",
             "composition",
         ]
-        asset_step = step.get("name", "").lower() in ["rig"]
+        asset_step = step.get("name", "").lower() in ["rig", "rigging"]
 
         self.logger.debug("Starting to read a scene data")
         workfile = self.check_workfile(context, sg, name)
